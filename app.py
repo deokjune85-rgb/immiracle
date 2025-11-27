@@ -21,7 +21,7 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
     # 멀티모달 분석이 가능한 모델 로드 (JSON 모드 지원)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    model = genai.GenerativeModel('gemini-2.5-flash') 
 except Exception as e:
     st.error(f"❌ AI 엔진 초기화 실패: GOOGLE_API_KEY를 Streamlit Secrets에 설정하세요. {e}")
     st.stop()
