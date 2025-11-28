@@ -1,0 +1,7 @@
+GOOGLE_API_KEY = "AIzaSy..."
+SHEET_NAME = "IMD_DB"  <-- 이 줄이 빠져서 에러가 난 거다. 지금 넣어라.
+
+[gcp_service_account]
+type = "service_account"
+project_id = "..."
+...
