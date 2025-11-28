@@ -18,7 +18,7 @@ import requests # requests 모듈 추가
 # ---------------------------------------
 
 # [★중요★] 여기에 깃허브 JSON 파일의 Raw URL을 입력하세요.
-GITHUB_JSON_URL = "https://raw.githubusercontent.com/YOUR_ID/YOUR_REPO/main/agencies.json" 
+GITHUB_JSON_URL = "https://raw.githubusercontent.com/deokjune85/immiracle/main/agencies.json" 
 
 st.set_page_config(
     page_title="IMD Insight - AI 기반 진실 분석 및 법률 전략실",
