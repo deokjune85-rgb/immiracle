@@ -29,7 +29,7 @@ st.set_page_config(
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    model = genai.GenerativeModel('gemini-2.0-flash') 
 except Exception:
     model = None
 
