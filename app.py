@@ -1,4 +1,4 @@
-# app.py (AURA Insight v3.0 - OMEGA Protocol Implementation)
+# app.py (IMD Insight v3.0 - OMEGA Protocol Implementation)
 import streamlit as st
 import google.generativeai as genai
 import time
@@ -55,7 +55,7 @@ footer { visibility: hidden !important; }
     }
 }
 
-/* === AURA Insight 프리미엄 다크 테마 === */
+/* === IMD Insight 프리미엄 다크 테마 === */
 .stApp {
     background-color: #101010; /* Deep Black */
     color: #E0E0E0;
@@ -234,7 +234,7 @@ def get_risk_style(level):
 # 4. 메인 애플리케이션 로직 (Frontend)
 # ---------------------------------------
 
-st.title("AURA Insight 👁️")
+st.title("아이엠디 인사이트 - 리스크 관리 매니지먼트")
 st.markdown("<h3 style='text-align: center; color: #AAAAAA;'>AI 기반 진실 분석 및 전문가 매칭 플랫폼</h3>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -244,7 +244,7 @@ if 'step' not in st.session_state:
 
 # --- Step 1: 서비스 선택 및 데이터 입력 ---
 if st.session_state.step == 1:
-    st.warning("🔒 모든 데이터는 암호화되어 처리됩니다. AURA Insight는 고객의 비밀 보장을 최우선으로 합니다.")
+    st.warning("🔒 모든 데이터는 암호화되어 처리됩니다. 아이엠디 인사이트는 고객의 비밀 보장을 최우선으로 합니다.")
 
     st.markdown("<h2>1. AI 분석 서비스 선택</h2>", unsafe_allow_html=True)
     service_type = st.radio(
@@ -278,7 +278,7 @@ if st.session_state.step == 1:
             st.warning("구체적인 정황 설명을 필수로 입력해야 합니다.")
         else:
             # AI 분석 실행
-            with st.spinner("🧠 AURA AI 엔진이 증거 자료와 정황을 실시간으로 교차 분석 중입니다... (최대 30초 소요)"):
+            with st.spinner("아이엠디 AI 엔진이 증거 자료와 정황을 실시간으로 교차 분석 중입니다... (최대 30초 소요)"):
                 analysis_result = perform_ai_analysis(service_type, details, uploaded_files)
             
             # 결과 저장 및 화면 전환
@@ -292,7 +292,7 @@ elif st.session_state.step == 2:
     result = st.session_state.analysis_result
     service_type = st.session_state.service_type
 
-    st.markdown("<h2>📊 AURA Insight - 최종 분석 리포트</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>아이엠디 인사이트 - 최종 분석 리포트</h2>", unsafe_allow_html=True)
 
     if "error" in result:
         st.error(f"❌ 분석 오류 발생: {result['error']}. 잠시 후 다시 시도해주세요.")
@@ -302,7 +302,7 @@ elif st.session_state.step == 2:
         
         # === SECTION 1: 헤더 & 스코어 (시각적 압도) ===
         st.markdown('<div class="analysis-section">', unsafe_allow_html=True)
-        st.subheader("📊 AI 정밀 진단 결과")
+        st.subheader("AI 정밀 진단 결과")
         
         risk = result.get('risk_assessment', {})
         score = risk.get('score', 0)
@@ -384,7 +384,7 @@ elif st.session_state.step == 2:
 
     # === SECTION 5: 전문가 매칭 CTA (해결책 제시) ===
     st.markdown("---")
-    st.markdown("<h2>💡 AURA 솔루션 : 전문가 연결</h2>", unsafe_allow_html=True)
+    st.markdown("<h2>💡 아이엠디 솔루션 : 전문가 연결</h2>", unsafe_allow_html=True)
     st.info("AI가 귀하의 케이스에 가장 적합한 [지역 전문 탐정]과 [이혼 전문 변호사]를 선별했습니다. 사라지기 전에 증거를 잡고, 법대로 응징하십시오.")
 
     # 리드 수집 폼
