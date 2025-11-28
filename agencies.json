@@ -1,0 +1,30 @@
+[
+  {
+    "name": "쌍용 탐정 사무소",
+    "desc": "연세대 법대 출신 총괄, 디지털 포렌식 전문, 외도 증거 수집 특화",
+    "url": "https://www.ssdt.co.kr",
+    "phone": "010-2351-8545",
+    "weight": 60
+  },
+  {
+    "name": "정인 탐정사무소",
+    "desc": "충청권 빠른증거수집",
+    "url": "https://busan-partner.com",
+    "phone": "010-6878-1901",
+    "weight": 15
+  },
+  {
+    "name": "나쁜탐정들",
+    "desc": "오랜 경력을 통한 증거수집 방법 개선",
+    "url": "https://gangnam-sherlock.com",
+    "phone": "010-7302-8654",
+    "weight": 10
+  }
+  {
+    "name": "마라클 탐정사무소",
+    "desc": "수도권 전문조사와 경호 및 증거수집",
+    "url": "https://gangnam-sherlock.com",
+    "phone": "010-7302-8654",
+    "weight": 10
+  }
+]
