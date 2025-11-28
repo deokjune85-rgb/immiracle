@@ -31,10 +31,29 @@ except Exception as e:
 # ---------------------------------------
 custom_css = """
 <style>
-/* 관리자 기능 제거로 사이드바 숨김 처리 */
-[data-testid="stSidebar"] { display: none; }
-#MainMenu, footer, header, .stDeployButton {visibility:hidden;} 
+/* === 스트림릿 브랜딩 완전 제거 (스텔스 모드) === */
+#MainMenu { visibility: hidden !important; } /* 햄버거 메뉴 제거 */
+header { visibility: hidden !important; }    /* 상단 헤더 제거 */
+footer { visibility: hidden !important; }    /* 하단 'Made with Streamlit' 제거 */
+.stDeployButton { display: none !important; } /* 우상단 Deploy 버튼 제거 (배포 시) */
 
+/* 상단 장식 제거 및 패딩 조정하여 독립 앱처럼 보이게 함 */
+.stApp [data-testid="stDecoration"] {
+    display: none !important;
+}
+.stApp .main .block-container {
+    padding-top: 2rem !important; /* 헤더 제거로 인한 상단 여백 조정 */
+}
+
+/* === 모바일 최적화 (필수) === */
+@media (max-width: 768px) {
+    .stApp .main .block-container {
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+    }
+}
+
+/* === AURA Insight 프리미엄 다크 테마 (기존 코드 유지) === */
 .stApp {
     background-color: #101010; /* Deep Black */
     color: #E0E0E0;
@@ -72,8 +91,13 @@ h2 {
 .stButton>button[kind="primary"]:hover, div[data-testid="stForm"] button[type="submit"]:hover {
     background-color: #B8860B !important;
 }
+
+/* 관리자 기능 제거로 사이드바 숨김 처리 (v2.1 기준) */
+[data-testid="stSidebar"] { display: none; } 
 </style>
 """
+# 이 CSS를 app.py 상단에 적용하는 코드는 그대로 유지:
+# st.markdown(custom_css, unsafe_allow_html=True)
 st.markdown(custom_css, unsafe_allow_html=True)
 
 # ---------------------------------------
