@@ -27,7 +27,7 @@ try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
     # 분석용 모델(정확성)과 생성용 모델(창의성)을 동일 인스턴스로 사용하되, 호출 시 설정을 변경
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') 
+    model = genai.GenerativeModel('gemini-2.0-flash') 
 except Exception:
     model = None # API 키 오류 시에도 시스템 작동 유지
 
