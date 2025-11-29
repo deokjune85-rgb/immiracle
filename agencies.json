@@ -1,7 +1,7 @@
 [
   {
     "name": "쌍용 탐정 사무소",
-    "desc": "연세대 법대 출신 총괄, 디지털 포렌식 전문, 외도 증거 수집 특화",
+    "desc": "디지털 포렌식 전문, 외도 증거 수집 특화",
     "url": "https://www.ssdt.co.kr",
     "phone": "010-2351-8545",
     "weight": 60
@@ -15,15 +15,28 @@
   },
   {
     "name": "나쁜탐정들",
-    "desc": "오랜 경력을 통한 증거수집 방법 개선",
-    "url": "https://gangnam-sherlock.com",
-    "phone": "010-7302-8654",
+    "desc": "국내 최초 컨트롤타워 운영시스템. 오랜 경력을 통한 증거수집 방법 개선",
+    "url": "https://baddetectives.co.kr/",
+    "phone": "010-4538-0924",
+    "weight": 10
+  },
+  {
+    "name": "열정흥신소",
+    "desc": "신속한 업무처리 최상의 결과",
+    "url": "https://passiondt.kr/",
+    "phone": "010-3919-4186",
+    "weight": 10
+  },
+  {
+    "name": "정인흥신소",
+    "desc": "수많은 누적 성공사례를 보유하고 있습니다",
+    "url": "https://www.jungindt.co.kr/",
+    "phone": "010-3919-4186",
     "weight": 10
   },
   {
     "name": "마라클 탐정사무소",
     "desc": "수도권 전문조사와 경호 및 증거수집",
-    "url": "https://gangnam-sherlock.com",
     "phone": "010-7302-8654",
     "weight": 10
   }
