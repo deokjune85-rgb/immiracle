@@ -1,4 +1,4 @@
-# app.py (IMD Insight v5.0 - Questionnaire & Multi-Recommendation Engine)
+# app.py (IMD Insight v5.1 - Dynamic UX & Persuasion Engine)
 import streamlit as st
 import google.generativeai as genai
 import time
@@ -9,6 +9,10 @@ from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
+# Pillow(PIL)과 io는 설문 기반에서는 불필요하나, 추후 이미지 분석 확장을 위해 유지
+from PIL import Image
+import io
+import pandas as pd
 
 # ---------------------------------------
 # 0. 시스템 설정 및 초기화
@@ -23,13 +27,14 @@ st.set_page_config(
 )
 
 # API 키 설정 (Gemini)
+model = None
 try:
     API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=API_KEY)
-    # 분석용 모델(정확성)과 생성용 모델(창의성)을 동일 인스턴스로 사용하되, 호출 시 설정을 변경
     model = genai.GenerativeModel('gemini-2.0-flash') 
-except Exception:
-    model = None # API 키 오류 시에도 시스템 작동 유지
+except Exception as e:
+    print(f"AI Model Initialization Failed: {e}")
+    # API 키 오류 발생 시에도 시스템 작동 유지 (일부 기능 제한)
 
 # ---------------------------------------
 # 1. UI/UX 스타일링 (IMD Branding + Cloaking)
@@ -65,6 +70,12 @@ h2, h3, h4 { color: #D4AF37; }
     background-color: #2C2C2C;
     color: white;
 }
+/* 라디오 버튼 스타일링 강화 */
+.stRadio > label {
+    color: #D4AF37;
+    font-weight: bold;
+}
+
 /* 버튼 스타일링 */
 .stButton>button[kind="primary"], div[data-testid="stForm"] button[type="submit"] {
     width: 100%;
@@ -113,9 +124,18 @@ h2, h3, h4 { color: #D4AF37; }
     color: #D4AF37;
     margin-bottom: 5px;
 }
+/* AI 추천 이유 강조 스타일 (★v5.1 신규★) */
+.ai-reason {
+    background-color: #3a3a2a;
+    border-left: 4px solid #D4AF37;
+    padding: 10px;
+    margin-top: 10px;
+    font-style: italic;
+}
 </style>
 """
 st.markdown(custom_css, unsafe_allow_html=True)
+
 
 # ---------------------------------------
 # 2. 데이터 로딩 및 처리 (JSON 가중치 시스템)
@@ -130,31 +150,32 @@ def fetch_agencies():
         response = requests.get(GITHUB_JSON_URL)
         if response.status_code == 200:
             data = json.loads(response.text)
+            # 데이터 검증
+            validated_data = []
             for item in data:
-                if not isinstance(item.get('weight'), (int, float)) or item.get('weight', 0) <= 0:
-                    item['weight'] = 1
-            return data
+                if isinstance(item, dict) and 'name' in item and 'weight' in item:
+                    if not isinstance(item.get('weight'), (int, float)) or item.get('weight', 0) <= 0:
+                        item['weight'] = 1
+                    validated_data.append(item)
+            return validated_data
         return []
     except Exception as e:
         print(f"Error fetching agencies: {e}")
         return []
 
 def get_weighted_unique_recommendations(agencies, k=3):
-    """가중치를 기반으로 고유한 파트너사 K개를 선택합니다. (★v5.0 핵심 로직★)"""
+    """가중치를 기반으로 고유한 파트너사 K개를 선택합니다."""
     if not agencies or k <= 0:
         return []
 
-    # 사용 가능한 업체 수가 요청 수(K)보다 적으면 모두 반환 (랜덤 셔플)
     if len(agencies) <= k:
         shuffled = list(agencies)
         random.shuffle(shuffled)
         return shuffled
 
     selected = []
-    # 중복을 피하기 위해 복사본 생성
     pool = list(agencies)
     
-    # 가중치 기반 선택 (중복 없이 k개 선택)
     for _ in range(k):
         if not pool:
             break
@@ -162,13 +183,10 @@ def get_weighted_unique_recommendations(agencies, k=3):
         weights = [agency.get('weight', 1) for agency in pool]
         
         try:
-            # 가중치 기반으로 1개 선택
             choice = random.choices(pool, weights=weights, k=1)[0]
             selected.append(choice)
-            # 선택된 항목 제거하여 중복 방지
             pool.remove(choice)
         except Exception as e:
-            # 오류 발생 시 남은 항목에서 랜덤 선택 (Fallback)
             print(f"Weighted selection error: {e}. Falling back.")
             choice = random.choice(pool)
             selected.append(choice)
@@ -194,7 +212,6 @@ def save_lead_to_google_sheets(lead_data):
         sheet = client.open(sheet_name).sheet1
 
         if not sheet.row_values(1):
-            # 헤더 수정: Details 대신 Questionnaire Data, Vault Hash 추가
             headers = ["Timestamp", "Name", "Phone", "Risk Score", "Evidence Score", "Service Type", "Questionnaire Data", "Vault Hash", "Recommended Partners"]
             sheet.append_row(headers)
 
@@ -220,9 +237,9 @@ def save_lead_to_google_sheets(lead_data):
 # ---------------------------------------
 
 def get_analysis_prompt(service_type, dossier_info, questionnaire_data):
-    """설문 기반 AI 분석 프롬프트 정의 (v5.0 Schema)."""
+    """설문 기반 AI 분석 프롬프트 정의 (v5.1 Schema)."""
     
-    # OMEGA Protocol JSON Schema (v5.0 수정)
+    # OMEGA Protocol JSON Schema (v5.1 수정)
     omega_schema = """
     {
       "risk_assessment": {
@@ -231,15 +248,12 @@ def get_analysis_prompt(service_type, dossier_info, questionnaire_data):
         "summary": "(string: 충격적인 상황 요약 및 행동 촉구 메시지)"
       },
       "deep_analysis": {
-        "communication": {
-          "analysis": "(string: 연락/대화 패턴 분석)"
-        },
-        "behavioral": {
-          "analysis": "(string: 행동 변화 및 의심 정황 분석)"
-        },
-        "financial": {
-           "analysis": "(string: 재정 활동 분석 - 관련 설문 기반)"
-        }
+        "pattern1_title": "(string: 핵심 분석 영역 1 제목. 예: 행동 패턴 변화)",
+        "pattern1_analysis": "(string: 분석 내용)",
+        "pattern2_title": "(string: 핵심 분석 영역 2 제목. 예: 소통 방식 변화)",
+        "pattern2_analysis": "(string: 분석 내용)",
+        "pattern3_title": "(string: 핵심 분석 영역 3 제목. 예: 의심 정황 분석)",
+        "pattern3_analysis": "(string: 분석 내용)"
       },
       "litigation_readiness": {
         "suspicion_score": (int),
@@ -265,21 +279,22 @@ def get_analysis_prompt(service_type, dossier_info, questionnaire_data):
     }
     """
 
-    # 설문 데이터를 텍스트로 변환
+    # 설문 데이터를 텍스트로 변환 (Dossier 정보 및 자유 서술 포함)
     q_data_text = "\n".join([f"- {q}: {a}" for q, a in questionnaire_data.items()])
 
     if "💔" in service_type: # 불륜 분석
         return f"""
         [시스템 역할]: AI 기반 외도 위험성 평가 전략가.
-        [목표]: 입력된 설문 데이터와 상대방 정보를 기반으로 '불륜 가능성'을 평가하고 전략 로드맵(War Room) 및 대상자 프로파일링(Dossier)을 제시.
+        [목표]: 입력된 설문 데이터와 상대방 정보를 기반으로 '불륜 가능성'을 평가하고 전략 로드맵을 제시.
         [분석 지침]:
-        1. 입력된 설문조사 결과를 객관적인 데이터로 간주하고 분석. 응답의 강도('매우 그렇다' 등)를 반영할 것.
+        1. 입력된 설문조사 결과(자유 서술 포함)를 객관적인 데이터로 간주하고 분석. 응답의 강도를 반영할 것.
         2. 상대방 정보(직업/성향)를 고려하여 'the_dossier'와 'the_war_room'을 맞춤 설계.
         3. ★중요★ 'litigation_readiness.evidence_score'는 극도로 낮게 평가해야 함 (설문은 심증일 뿐 물증이 아님). 물리적 증거 확보의 필요성을 강력히 경고할 것.
+        4. 'deep_analysis'의 3가지 영역 제목과 내용을 설문 결과에 맞춰 적절히 생성할 것.
         
         [입력 데이터 요약]
         1. 상대방 직업/성향 (THE DOSSIER 정보): {dossier_info}
-        2. [설문조사 결과 (증거 데이터)]:
+        2. [설문조사 결과 및 추가 정황 (증거 데이터)]:
         {q_data_text}
 
         [출력 형식]: 반드시 아래 JSON 스키마를 준수하여 출력. 다른 설명은 절대 금지.
@@ -303,7 +318,6 @@ def perform_ai_analysis(service_type, dossier_info, questionnaire_data):
         generation_config = genai.GenerationConfig(temperature=0.2, response_mime_type="application/json")
         safety_settings = [{"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"}]
         
-        # 설문 기반이므로 입력은 텍스트 프롬프트만 사용
         response = model.generate_content(prompt, generation_config=generation_config, safety_settings=safety_settings)
         
         result = json.loads(response.text)
@@ -313,10 +327,10 @@ def perform_ai_analysis(service_type, dossier_info, questionnaire_data):
         return {"error": f"AI 분석 중 오류 발생 또는 응답 형식 오류: {e}."}
 
 # ---------------------------------------
-# 5. AI 추천 이유 생성기 (★v5.0 신규★)
+# 5. AI 추천 이유 생성기 (★v5.1 강화★)
 # ---------------------------------------
 def generate_recommendation_reasons(agencies, analysis_result):
-    """AI를 사용하여 분석 결과에 기반한 맞춤형 추천 이유를 생성합니다. (JSON 모드)"""
+    """AI를 사용하여 맞춤형 추천 이유를 생성합니다. (설득력 강화 및 창의성 증대)"""
     
     if not model or not agencies:
         return {}
@@ -325,44 +339,56 @@ def generate_recommendation_reasons(agencies, analysis_result):
     agency_list_text = ""
     expected_json_structure = "{\n"
     for agency in agencies:
-        agency_list_text += f"- 업체명: {agency['name']}\n  특징: {agency['desc']}\n"
-        expected_json_structure += f'  "{agency["name"]}": "(string: 추천 이유)",\n'
+        agency_list_text += f"- 업체명: {agency['name']}\n  강점(특징): {agency['desc']}\n"
+        # JSON 키 안정성 확보
+        safe_key = agency["name"].replace('"', '\\"')
+        expected_json_structure += f'  "{safe_key}": "(string: 추천 이유)",\n'
     expected_json_structure = expected_json_structure.rstrip(',\n') + "\n}"
 
-    # 분석 결과 요약
+    # 분석 결과 요약 (고객의 약점)
     risk_summary = analysis_result.get('risk_assessment', {}).get('summary', 'N/A')
     needed_evidence = ", ".join(analysis_result.get('litigation_readiness', {}).get('needed_evidence', []))
+    dossier_profile = analysis_result.get('the_dossier', {}).get('profile', 'N/A')
 
+    # [★v5.1 강화된 프롬프트★] 전략가 페르소나 및 약점-강점 연결 강조
     prompt = f"""
-    당신은 IMD Insight의 수석 컨설턴트입니다. AI 분석 결과를 바탕으로, 추천된 전문 업체(탐정사무소)들이 왜 이 의뢰인에게 적합한지 설명하는 '추천 이유'를 생성해야 합니다.
+    [시스템 역할]: 당신은 IMD Insight의 수석 전략 컨설턴트입니다. 목표는 의뢰인이 추천된 전문가(탐정사무소)에게 즉시 연락하도록 설득하는 것입니다.
+    [과제]: AI 분석 결과를 바탕으로, 추천된 업체들이 왜 이 의뢰인에게 '유일한 해결책'인지 설명하는 '추천 이유'를 생성하십시오.
 
-    [AI 분석 요약]
+    [의뢰인 상황 분석 (약점)]
     - 리스크 요약: {risk_summary}
-    - 필요한 증거: {needed_evidence}
+    - 부족한 증거 (시급): {needed_evidence}
+    - 대상자 프로파일: {dossier_profile}
 
-    [추천 대상 업체 목록]
+    [추천 대상 업체 목록 (강점)]
     {agency_list_text}
 
-    [작성 지침]:
+    [작성 지침 - 설득의 기술]:
     1. 각 업체별로 추천 이유를 1~2문장으로 작성합니다.
-    2. 업체의 '특징'과 의뢰인의 '현재 상황(분석 결과)'을 연결하여 설득력 있게 작성합니다.
+    2. ★매우 중요★ 업체의 '강점'을 의뢰인의 '약점(부족한 증거, 대상자 성향)'과 직접 연결하여 설득력을 극대화합니다.
+       (예: "디지털 증거 확보가 시급하므로, '디지털 포렌식 전문'인 [업체명]의 기술력이 필수적입니다.")
     3. 창의적이고 전문적인 어조를 사용합니다. (환각 허용)
 
     [출력 형식]: 반드시 아래 JSON 스키마를 준수하여 출력. Key는 업체명, Value는 추천 이유입니다.
     {expected_json_structure}
     """
     try:
-        # 창의성을 위해 Temperature 0.7 사용, JSON 모드 강제
-        generation_config = genai.GenerationConfig(temperature=0.7, response_mime_type="application/json")
+        # 창의성을 위해 Temperature 0.8로 상향 조정, JSON 모드 강제
+        generation_config = genai.GenerationConfig(temperature=0.8, response_mime_type="application/json")
         response = model.generate_content(prompt, generation_config=generation_config)
+        
+        # JSON 파싱 및 검증
         reasons = json.loads(response.text)
-        return reasons
+        if isinstance(reasons, dict):
+            return reasons
+        else:
+            return {}
     except Exception as e:
-        print(f"추천 이유 생성 실패: {e}")
+        print(f"추천 이유 생성 실패 (JSON 파싱 오류 포함): {e}")
         return {}
 
 # ---------------------------------------
-# 6. 헬퍼 함수 및 THE VAULT (수정됨)
+# 6. 헬퍼 함수 및 THE VAULT
 # ---------------------------------------
 def get_risk_style(level):
     if level == "CRITICAL": return "risk-critical"
@@ -371,11 +397,9 @@ def get_risk_style(level):
     return "risk-normal"
 
 def process_and_vault_questionnaire(data):
-    """설문 데이터를 봉인하고 해시를 생성합니다. (v5.0 수정)"""
+    """설문 데이터를 봉인하고 해시를 생성합니다."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC")
-    # 데이터를 JSON 문자열로 변환
     data_string = json.dumps(data, sort_keys=True, ensure_ascii=False)
-    # 문자열 기반 해시 생성
     data_hash = hashlib.sha256(data_string.encode('utf-8')).hexdigest()
     
     return {"hash": data_hash, "timestamp": timestamp}
@@ -390,7 +414,7 @@ st.markdown("<h3 style='text-align: center; color: #AAAAAA;'>대한민국 1%를 
 st.markdown("<p style='text-align: center; color: #D4AF37;'>진실은 결코 숨길 수 없다.</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# 세션 상태 관리 (input_step 추가)
+# 세션 상태 관리
 if 'step' not in st.session_state:
     st.session_state.step = 1
 if 'input_step' not in st.session_state:
@@ -398,12 +422,12 @@ if 'input_step' not in st.session_state:
 if 'answers' not in st.session_state:
     st.session_state.answers = {}
 
-# --- Step 1: 서비스 선택 및 데이터 입력 (단계별 설문 방식) ---
+# 서비스 선택 (고정)
+service_type = "💔 배우자 불륜 분석 (외도 가능성 진단)"
+
+# --- Step 1: 데이터 입력 (단계별 설문 방식) ---
 if st.session_state.step == 1:
     st.warning("🔒 당신의 기록은 100% 익명이며, 로그는 즉시 파기됩니다.")
-
-    # 서비스 선택 (고정)
-    service_type = "💔 배우자 불륜 분석 (외도 가능성 진단)"
     
     # 입력 폼 진행률 표시
     total_steps = 4 # DOSSIER + 3단계 설문
@@ -423,42 +447,82 @@ if st.session_state.step == 1:
             st.session_state.input_step = 2
             st.rerun()
 
-    # --- 입력 Step 2: 행동 패턴 변화 ---
+    # --- 입력 Step 2: 행동 패턴 변화 (★v5.1 강화★) ---
     elif st.session_state.input_step == 2:
         st.markdown(f"<h2>2/{total_steps}. 행동 패턴 변화 분석</h2>", unsafe_allow_html=True)
-        q1 = st.radio("Q1. 최근 상대방의 외출/귀가 시간이 불규칙해졌나요? (야근/회식/출장 등)", ("변화 없음", "가끔 증가함", "매우 빈번하게 증가함"), horizontal=True)
-        q2 = st.radio("Q2. 주말이나 휴일에 혼자만의 외출이 잦아졌나요?", ("변화 없음", "가끔 있음", "매우 잦음"), horizontal=True)
-        q3 = st.radio("Q3. 갑자기 외모 관리(운동, 옷 스타일, 향수)에 신경 쓰는 정도가 늘었나요?", ("변화 없음", "약간 늘어남", "과도하게 신경 씀"), horizontal=True)
+        st.info("최근 3개월 기준 상대방의 행동 변화를 체크해주세요.")
+        
+        st.markdown("#### Q1. 외출 및 귀가 시간의 불규칙성 (야근/회식/출장 등)")
+        q1 = st.radio("Q1.", ("변화 없음", "가끔 증가함", "매우 빈번하게 증가함"), horizontal=True, label_visibility="collapsed")
+        
+        st.markdown("#### Q2. 주말이나 휴일의 단독 외출 빈도")
+        q2 = st.radio("Q2.", ("변화 없음", "가끔 있음", "매우 잦음"), horizontal=True, label_visibility="collapsed")
+        
+        st.markdown("#### Q3. 외모 관리(운동, 옷 스타일, 향수)에 대한 관심도 증가")
+        q3 = st.radio("Q3.", ("변화 없음", "약간 늘어남", "과도하게 신경 씀"), horizontal=True, label_visibility="collapsed")
 
         if st.button("다음 단계로", type="primary"):
-            st.session_state.answers['behavior'] = {"q1_schedule": q1, "q2_weekend": q2, "q3_appearance": q3}
+            # 데이터 구조를 평탄화하여 저장 (프롬프트 주입 용이성 확보)
+            st.session_state.answers['behavior_q1_schedule'] = q1
+            st.session_state.answers['behavior_q2_weekend'] = q2
+            st.session_state.answers['behavior_q3_appearance'] = q3
             st.session_state.input_step = 3
             st.rerun()
 
-    # --- 입력 Step 3: 소통 및 관계 변화 ---
+    # --- 입력 Step 3: 소통 및 관계 변화 (★v5.1 강화★) ---
     elif st.session_state.input_step == 3:
         st.markdown(f"<h2>3/{total_steps}. 소통 및 관계 변화 분석</h2>", unsafe_allow_html=True)
-        q4 = st.radio("Q4. 휴대폰 사용 습관(잠금 강화, 숨김, 통화량 증가)이 변했나요?", ("변화 없음", "약간 의심됨", "확실히 변함"), horizontal=True)
-        q5 = st.radio("Q5. 대화 시 방어적이거나 비밀이 많아지고 짜증이 늘었나요?", ("변화 없음", "가끔 그럼", "매우 심해짐"), horizontal=True)
-        q6 = st.radio("Q6. 스킨십이나 부부관계 빈도가 눈에 띄게 줄었나요?", ("변화 없음", "약간 줄어듦", "거의 없음"), horizontal=True)
+        st.info("상대방과의 관계 및 소통 방식의 변화를 체크해주세요.")
+
+        st.markdown("#### Q4. 휴대폰 사용 습관 변화 (잠금 강화, 숨김, 통화량 증가)")
+        q4 = st.radio("Q4.", ("변화 없음", "약간 의심됨", "확실히 변함"), horizontal=True, label_visibility="collapsed")
+        
+        st.markdown("#### Q5. 대화 시 태도 변화 (방어적, 비밀 증가, 짜증 증가)")
+        q5 = st.radio("Q5.", ("변화 없음", "가끔 그럼", "매우 심해짐"), horizontal=True, label_visibility="collapsed")
+        
+        st.markdown("#### Q6. 스킨십이나 부부관계 빈도 변화")
+        q6 = st.radio("Q6.", ("변화 없음", "약간 줄어듦", "거의 없음"), horizontal=True, label_visibility="collapsed")
 
         if st.button("다음 단계로", type="primary"):
-            st.session_state.answers['communication'] = {"q4_phone": q4, "q5_defensive": q5, "q6_intimacy": q6}
+            st.session_state.answers['communication_q4_phone'] = q4
+            st.session_state.answers['communication_q5_defensive'] = q5
+            st.session_state.answers['communication_q6_intimacy'] = q6
             st.session_state.input_step = 4
             st.rerun()
 
-    # --- 입력 Step 4: 의심 정황 및 증거 ---
+    # --- 입력 Step 4: 의심 정황 및 자유 서술 (★v5.1 동적 안내 시스템★) ---
     elif st.session_state.input_step == 4:
-        st.markdown(f"<h2>4/{total_steps}. 의심 정황 및 증거 현황</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h2>4/{total_steps}. 의심 정황 및 추가 정보</h2>", unsafe_allow_html=True)
         q7 = st.radio("Q7. 차량 블랙박스/내비게이션 기록 삭제 흔적 또는 의심스러운 경로가 있나요?", ("확인 안 함/없음", "의심됨", "확실함"), horizontal=True)
         q8 = st.radio("Q8. 설명할 수 없는 지출이나 현금 사용이 늘었나요?", ("확인 안 함/없음", "의심됨", "확실함"), horizontal=True)
-        q9 = st.radio("Q9. 물리적인 증거(사진, 카톡 캡처, 영수증 등)를 확보하셨나요?", ("아니오 (심증만 있음)", "약간 확보함", "결정적 증거 확보함"), horizontal=True)
+        
+        # [★v5.1 동적 안내 시스템★]
+        st.subheader("추가적인 의심 정황 (선택)")
+        
+        # 이전 단계 답변을 기반으로 동적 Placeholder 생성
+        dynamic_placeholder = "AI 분석에 도움이 될 추가 정보를 자유롭게 작성해주세요.\n\n"
+        # 평탄화된 데이터 구조에 맞춰 접근 방식 변경
+        if st.session_state.answers.get('behavior_q1_schedule') == "매우 빈번하게 증가함":
+            dynamic_placeholder += "예: 야근이나 출장이 구체적으로 언제, 어디서 있었는지 알고 계신가요?\n"
+        if st.session_state.answers.get('communication_q4_phone') == "확실히 변함":
+            dynamic_placeholder += "예: 휴대폰 비밀번호를 바꾸거나 특정 앱을 숨기는 행동이 있었나요?\n"
+        if st.session_state.answers.get('behavior_q2_weekend') == "매우 잦음":
+             dynamic_placeholder += "예: 주말 외출 시 행선지를 명확히 말하지 않나요?\n"
+
+        q9_freetext = st.text_area(
+            "AI 분석 가이드라인",
+            height=150,
+            placeholder=dynamic_placeholder,
+            label_visibility="collapsed"
+        )
 
 
         if st.button("⚡ AI 전략 분석 시작하기", type="primary"):
-            st.session_state.answers['evidence'] = {"q7_car": q7, "q8_finance": q8, "q9_physical": q9}
+            st.session_state.answers['evidence_q7_car'] = q7
+            st.session_state.answers['evidence_q8_finance'] = q8
+            st.session_state.answers['evidence_q9_freetext'] = q9_freetext
             
-            # THE VAULT 실행 (설문 데이터 봉인)
+            # THE VAULT 실행
             with st.spinner("🔐 THE VAULT: 입력된 증언을 디지털 금고에 안전하게 봉인 중..."):
                 vault_info = process_and_vault_questionnaire(st.session_state.answers)
                 time.sleep(1)
@@ -467,7 +531,6 @@ if st.session_state.step == 1:
             dossier_info = f"직업: {st.session_state.answers.get('dossier_job')}, 성향: {st.session_state.answers.get('dossier_personality')}"
             
             with st.spinner("🧠 IMD AI 엔진이 행동 패턴을 분석하고 전략을 수립 중입니다..."):
-                # 분석 시 설문 데이터 전달
                 analysis_result = perform_ai_analysis(service_type, dossier_info, st.session_state.answers)
             
             # 결과 저장 및 화면 전환
@@ -522,16 +585,16 @@ elif st.session_state.step == 2:
         st.subheader("🧐 AI 패턴 해부 (Deep Analysis)")
         analysis = result.get('deep_analysis', {})
         
-        st.markdown("#### 1. 행동 변화 패턴 분석")
-        st.write(analysis.get('behavioral', {}).get('analysis', 'N/A'))
+        st.markdown(f"#### 1. {analysis.get('pattern1_title', '분석 영역 1')}")
+        st.write(analysis.get('pattern1_analysis', 'N/A'))
         st.markdown("---")
 
-        st.markdown("#### 2. 소통 방식 분석")
-        st.write(analysis.get('communication', {}).get('analysis', 'N/A'))
+        st.markdown(f"#### 2. {analysis.get('pattern2_title', '분석 영역 2')}")
+        st.write(analysis.get('pattern2_analysis', 'N/A'))
         st.markdown("---")
 
-        st.markdown("#### 3. 재정 활동 분석")
-        st.write(analysis.get('financial', {}).get('analysis', 'N/A'))
+        st.markdown(f"#### 3. {analysis.get('pattern3_title', '분석 영역 3')}")
+        st.write(analysis.get('pattern3_analysis', 'N/A'))
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -589,7 +652,7 @@ elif st.session_state.step == 2:
         recommended_agencies = get_weighted_unique_recommendations(PARTNER_AGENCIES, k=3)
 
 
-    # === SECTION 6: 파트너 추천 및 리드 확보 (★v5.0 핵심★) ===
+    # === SECTION 6: 파트너 추천 및 리드 확보 (★v5.1 핵심★) ===
     st.markdown("---")
     st.markdown("<h2>💡 IMD 솔루션 : 검증된 전문가 연결</h2>", unsafe_allow_html=True)
     
@@ -601,21 +664,27 @@ elif st.session_state.step == 2:
             recommended_partners_names = ", ".join([a['name'] for a in recommended_agencies])
             st.error("🚨 분석 결과, 전문가의 즉각적인 개입이 필요합니다. IMD 알고리즘이 귀하의 케이스에 최적화된 전문가 3곳을 선별했습니다.")
 
-            # AI 추천 이유 생성 (★v5.0 핵심★)
-            with st.spinner("AI가 맞춤형 추천 이유를 생성 중입니다..."):
-                recommendation_reasons = generate_recommendation_reasons(recommended_agencies, result)
+            # AI 추천 이유 생성 (★v5.1 핵심★)
+            if model:
+                with st.spinner("AI가 맞춤형 추천 이유를 생성 중입니다..."):
+                    recommendation_reasons = generate_recommendation_reasons(recommended_agencies, result)
+            else:
+                recommendation_reasons = {}
+                st.warning("AI 엔진 연결 문제로 맞춤형 추천 이유 생성이 제한됩니다.")
 
             # 추천된 파트너사 목록 표시
             for agency in recommended_agencies:
                 # AI가 생성한 이유를 사용, 실패 시 기본 메시지 사용
-                reason = recommendation_reasons.get(agency['name'], "IMD 검증 완료된 우수 업체입니다.")
+                reason = recommendation_reasons.get(agency['name'])
+                if not reason:
+                     reason = "IMD 검증 완료된 우수 업체입니다."
                 
                 st.markdown(f"""
                 <div class="partner-box">
-                    <div class="partner-name">{agency['name']}</div>
+                    <div class="partner-name">🏆 {agency['name']}</div>
                     <p><i>"{agency['desc']}"</i></p>
-                    <p style="color: #D4AF37;">💡 **AI 추천 이유:** {reason}</p>
-                    <p>📞 연락처: <strong>{agency['phone']}</strong></p>
+                    <div class="ai-reason">💡 <strong>AI 추천 이유:</strong> {reason}</div>
+                    <p style="margin-top: 10px;">📞 연락처: <strong>{agency['phone']}</strong></p>
                     <p>🌐 웹사이트: <a href="{agency['url']}" target="_blank" style="color: #AAAAAA;">방문하기</a></p>
                 </div>
                 """, unsafe_allow_html=True)
