@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Security - AI 디지털 포렌식 & 보안 전문</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <iframe src="https://imdmiracle.streamlit.app/?embed=true"></iframe>
+</body>
+</html>
+```
+
+5. **Commit changes** 클릭
+
+---
+
+## 저장소 구조 확인
+
+완료되면 이런 구조가 되어야 해요:
+```
+저장소/
+├── .streamlit/
+│   └── config.toml
+├── index.html          ← 여기 (루트)
+├── app.py
+├── agencies.json
+└── requirements.txt
