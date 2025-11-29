@@ -41,7 +41,7 @@ except Exception as e:
 # ---------------------------------------
 custom_css = """
 <style>
-/* === 스트림릿 브랜딩 완전 제거 === */
+/* === 스트림릿 브랜딩 완전 제거 (스텔스 모드) === */
 #MainMenu { visibility: hidden !important; } 
 header { visibility: hidden !important; }    
 footer { visibility: hidden !important; }    
@@ -50,28 +50,47 @@ footer { visibility: hidden !important; }
 .stApp [data-testid="stDecoration"] { display: none !important; }
 .stApp .main .block-container { padding-top: 2rem !important; }
 
-/* === 프리미엄 다크 테마 === */
+/* === 프리미엄 다크 테마 및 가독성 강화 (★v5.4 수정★) === */
 .stApp {
     background-color: #0C0C0C;
-    color: #E0E0E0;
+    /* 기본 텍스트 색상을 완전한 흰색에 가깝게 변경 (#E0E0E0 -> #F5F5F5) */
+    color: #F5F5F5; 
     font-family: 'Pretendard', sans-serif;
 }
+
+/* 모든 주요 텍스트 요소에 색상 강제 적용 (!important 사용) */
+body, p, div, span, li, label, .stMarkdown p, .stMarkdown li, .stMarkdown span {
+    color: #F5F5F5 !important;
+}
+
+
 h1 {
-    color: #D4AF37;
+    color: #D4AF37; /* Premium Gold */
     font-weight: 800;
     text-align: center;
     font-family: serif;
 }
-h2, h3, h4 { color: #D4AF37; }
+h2, h3, h4 { color: #D4AF37 !important; } /* 헤더 색상도 강제 적용 */
 
-.stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div, .stRadio > div {
+/* 입력 필드 및 라디오 버튼 스타일링 */
+.stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div {
     background-color: #2C2C2C;
-    color: white;
+    color: white !important; /* 입력창 내부 텍스트 흰색 강제 */
 }
+
+.stRadio > div {
+    background-color: #2C2C2C;
+}
+
 .stRadio > label {
-    color: #D4AF37;
+    color: #D4AF37 !important; /* 라디오 질문 텍스트 색상 강제 */
     font-weight: bold;
 }
+/* 라디오 버튼 옵션 텍스트 색상 강제 */
+.stRadio > div > div > label > div[data-testid="stMarkdownContainer"] > p {
+     color: #F5F5F5 !important;
+}
+
 
 /* 버튼 스타일링 */
 .stButton>button[kind="primary"], div[data-testid="stForm"] button[type="submit"] {
@@ -107,7 +126,10 @@ h2, h3, h4 { color: #D4AF37; }
 .gap-highlight { border: 3px solid #FF4B4B; padding: 25px; background-color: #4a1a1a; margin-bottom: 20px; border-radius: 10px; }
 
 /* THE VAULT 스타일 */
-.vault-confirmation { background-color: #2a2a4a; color: #00FF00; padding: 15px; border-radius: 5px; font-family: monospace; margin-bottom: 20px; }
+.vault-confirmation { background-color: #2a2a4a; color: #00FF00 !important; padding: 15px; border-radius: 5px; font-family: monospace; margin-bottom: 20px; }
+/* VAULT 내부 텍스트(st.text로 생성된 요소)도 강제 적용 */
+.vault-confirmation .stText { color: #00FF00 !important; }
+
 
 /* 파트너사 추천 박스 스타일 */
 .partner-box {
@@ -120,7 +142,7 @@ h2, h3, h4 { color: #D4AF37; }
 .partner-name {
     font-size: 18px;
     font-weight: bold;
-    color: #D4AF37;
+    color: #D4AF37 !important;
     margin-bottom: 5px;
 }
 .ai-reason {
@@ -131,14 +153,22 @@ h2, h3, h4 { color: #D4AF37; }
     font-style: italic;
 }
 
-/* AI 코멘트 박스 (★v5.3 신규★) */
+/* AI 코멘트 박스 */
 .ai-comment-box {
     background-color: #2a2a3a;
     border-left: 4px solid #D4AF37;
     padding: 20px;
     margin: 15px 0;
     border-radius: 0 8px 8px 0;
-    line-height: 1.8; /* 가독성 향상 */
+    line-height: 1.8;
+}
+
+/* 링크 색상 조정 */
+a, a:visited {
+    color: #AAAAAA !important;
+}
+a:hover {
+    color: #D4AF37 !important;
 }
 </style>
 """
