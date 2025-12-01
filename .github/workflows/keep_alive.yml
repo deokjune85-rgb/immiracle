@@ -1,0 +1,19 @@
+name: Keep Streamlit App Alive
+
+# 트리거 설정: 15분마다 자동 실행 + 수동 실행 버튼 추가
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping_site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake up Streamlit App
+        run: |
+          # 1. 네 스트림릿 앱을 직접 타격해서 깨움 (헤더만 요청해서 부하 최소화)
+          curl -I https://imdmiracle.streamlit.app/
+          
+          # 2. 로그 출력 (성공 확인용)
+          echo "Ping sent to imdmiracle.streamlit.app successfully"
